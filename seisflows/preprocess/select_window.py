@@ -39,6 +39,10 @@ class select_window(custom_import('preprocess','base')):
         if 'CC_ACCEPTANCE_LEVEL' not in PAR:
             raise ParameterError(PAR, 'CC_ACCEPTANCE_LEVEL')
 
+        # data filtering option
+        if 'FILTER' not in PAR:
+            setattr(PAR, 'FILTER', None)
+        print("module used")
 
 ############################################## original #######################################
 #    def prepare_eval_grad(self, path='.'):
@@ -235,7 +239,7 @@ class select_window(custom_import('preprocess','base')):
             if PAR.FORMAT in ['SU', 'su']:
                filenames = []
                for channel in PAR.CHANNELS:
-                   filenames += ['U%s_file_single.su.adj' % channel]
+                   filenames += ['U%s_file_single_d.su.adj' % channel]
                return filenames
 
         else:
@@ -243,7 +247,7 @@ class select_window(custom_import('preprocess','base')):
             unix.cd('traces/obs')
 
             if PAR.FORMAT in ['SU', 'su']:
-                return glob('U?_file_single.su.adj')
+                return glob('U?_file_single_d.su.adj')
 
     def apply_mute_select_window(self, traces, iwindow, window_length):
         traces = self.mute_select_window(traces,

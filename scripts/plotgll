@@ -74,7 +74,6 @@ if __name__ == '__main__':
 
         For usage information: plotgll --help
     """
-
     args = parse_args()
 
     x = _read(args.xcoords)
@@ -89,8 +88,9 @@ if __name__ == '__main__':
 
     f, p = plot_gll(x, y, v)
 
+    #li_chao
     plt.axes().set_aspect('equal')
-
+    
     # set colormap
     if args.cmap:
         p.set_cmap(args.cmap)
@@ -118,6 +118,9 @@ if __name__ == '__main__':
         cb.set_label(args.title)
     else:
         plt.title(args.title)
-
+    
+    #yData=[2000,4000,6000]
+    #yLim=[400,800,1200]
+    #plt.yticks(yData,yLim)
     plt.show()
 

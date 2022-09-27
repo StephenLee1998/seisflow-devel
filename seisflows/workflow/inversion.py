@@ -10,6 +10,7 @@ from seisflows.tools import unix
 from seisflows.tools.tools import divides, exists
 from seisflows.config import ParameterError, save
 from seisflows.workflow.base import base
+from seisflows.tools.array import loadnpy, savenpy
 
 PAR = sys.modules['seisflows_parameters']
 PATH = sys.modules['seisflows_paths']
@@ -95,6 +96,22 @@ class inversion(base):
         if 'SAVERESIDUALS' not in PAR:
             setattr(PAR, 'SAVERESIDUALS', 0)
 
+############# Jiang change to clip model ############
+#        if 'VP_MIN' not in PAR:
+#            setattr(PAR, 'VP_MIN', 300)
+#
+#        if 'VP_MAX' not in PAR:
+#            setattr(PAR, 'VP_MAX', 6500)
+#
+#        if 'VS_MIN' not in PAR:
+#            setattr(PAR, 'VS_MIN', 50)
+#
+#        if 'VP_MAX' not in PAR:
+#            setattr(PAR, 'VS_MAX', 6000)
+#
+############# Jiang change to clip model ############
+
+
         # parameter assertions
         assert 1 <= PAR.BEGIN <= PAR.END
 
@@ -155,7 +172,8 @@ class inversion(base):
     def initialize(self):
         """ Prepares for next model update iteration
         """
-        self.write_model(path=PATH.GRAD, suffix='new')
+        #self.write_model(path=PATH.GRAD, suffix='new')
+        self.write_grad_model(path=PATH.GRAD, suffix='new')
 
         print 'Generating synthetics'
         system.run('solver', 'eval_func',
@@ -267,7 +285,33 @@ class inversion(base):
         """
         src = 'm_'+suffix
         dst = path +'/'+ 'model'
+        ############# Jiang change to clip model ############
+        #parts = solver.split(optimize.load(src))
+        #print(parts)
+        #for key in ['vp', 'vs']:
+        #    for iproc in range(PAR.NPROC):
+        #        if key == 'vp':
+        #            np.clip(parts[key][iproc],PAR.VP_MIN,PAR.VP_MAX)
+        #        if key == 'vs':
+        #            np.clip(parts[key][iproc],PAR.VS_MIN,PAR.VS_MAX)
+        #solver.save(parts, dst)
+        ############# Jiang change to clip model ############
+        #parts = solver.split(optimize.load(src))
+        #print(parts)
         solver.save(solver.split(optimize.load(src)), dst)
+
+
+    def write_grad_model(self, path='', suffix=''):
+        """ Writes model in format expected by solver
+        """
+        src = 'm_'+suffix
+        dst = path +'/'+ 'model'
+        #print('in write_grad_model')
+        parts = solver.split(optimize.load(src))
+        #print(parts)
+        #print(dst)
+        solver.save(solver.split(optimize.load(src)), dst)
+        #print('in write_grad_model, solver.save end')
 
 
     def write_gradient(self, path='', suffix=''):
@@ -298,6 +342,16 @@ class inversion(base):
     def save_model(self):
         src = 'm_new'
         dst = join(PATH.OUTPUT, 'model_%04d' % optimize.iter)
+        ############# Jiang change to clip model ############
+        #parts = solver.split(optimize.load(src))
+        #for key in ['vp', 'vs']:
+        #    for iproc in range(PAR.NPROC):
+        #        if key == 'vp':
+        #            np.clip(parts[key][iproc],PAR.VP_MIN,PAR.VP_MAX)
+        #        if key == 'vs':
+        #            np.clip(parts[key][iproc],PAR.VS_MIN,PAR.VS_MAX)
+        #solver.save(parts, dst)
+        ############# Jiang change to clip model ############
         solver.save(solver.split(optimize.load(src)), dst)
 
 

@@ -1,7 +1,8 @@
 
-import sys
+import sys, os
 from os.path import basename, join
 from glob import glob
+import time
 
 import numpy as np
 
@@ -95,6 +96,7 @@ class specfem2d(custom_import('solver', 'base')):
 
         call_solver(system.mpiexec(), 'bin/xmeshfem2D')
         call_solver(system.mpiexec(), 'bin/xspecfem2D')
+        
 
         if PAR.FORMAT in ['SU', 'su']:
             src = glob('OUTPUT_FILES/*.su')
@@ -119,7 +121,8 @@ class specfem2d(custom_import('solver', 'base')):
         if PAR.FORMAT in ['SU', 'su']:
             unix.cd(self.cwd +'/'+ 'traces/adj')
             for channel in ['x', 'y', 'z', 'p']:
-                src = 'U%s_file_single.su.adj' % PAR.CHANNELS[0]
+                # li_chao
+                src = 'U%s_file_single_d.su.adj' % PAR.CHANNELS[0]
                 dst = 'U%s_file_single.su.adj' % channel
                 if not exists(dst):
                     unix.cp(src, dst)
@@ -152,9 +155,33 @@ class specfem2d(custom_import('solver', 'base')):
         """
         setpar('SIMULATION_TYPE', '1')
         setpar('SAVE_FORWARD', '.true.')
+        
+        time1 = time.time()
 
         call_solver(system.mpiexec(), 'bin/xmeshfem2D')
         call_solver(system.mpiexec(), 'bin/xspecfem2D')
+
+        time2 = time.time()
+        #if (time2-time1) > 60
+        #    print('Warning: forward time = %8,0f sec' % (time2-time1))
+
+        if PAR.FORMAT in ['SU', 'su']:
+            filenames = glob('OUTPUT_FILES/*.su')
+            unix.mv(filenames, path)
+
+    def forward_linesearch(self, path='traces/syn'):
+        """ Calls SPECFEM2D forward solver
+        """
+        setpar('SIMULATION_TYPE', '1')
+        setpar('SAVE_FORWARD', '.false.')
+        
+        time1 = time.time()
+
+        call_solver(system.mpiexec(), 'bin/xmeshfem2D')
+        call_solver(system.mpiexec(), 'bin/xspecfem2D')
+
+        time2 = time.time()
+        #print('forward time = ' ,time2-time1)
 
         if PAR.FORMAT in ['SU', 'su']:
             filenames = glob('OUTPUT_FILES/*.su')
@@ -175,9 +202,54 @@ class specfem2d(custom_import('solver', 'base')):
             files = glob('traces/adj/*.su')
             unix.rename('.su', '.su.adj', files)
 
+        time1 = time.time()
+
         call_solver(system.mpiexec(), 'bin/xmeshfem2D')
         call_solver(system.mpiexec(), 'bin/xspecfem2D')
 
+        time2 = time.time()
+        #print('adjoint time = ',time2-time1)
+
+    #==== update for GPU support, added by YYR (Dec 22,2021) ===
+    #replace the internal version of smoothing in Python
+    def smooth(self, input_path='',output_path='',parameters=[],span=0.):
+        """ Smoooths kernels by convolving them with a Gaussian. Wrapper over
+            xsmooth_sem utility.
+        """
+        print('Starting smoothing')
+
+        t1 = time.time()
+        if not exist(input_path):
+            raise Exception
+        if not exist(output_path):
+            unix.mkdir(output_path)
+
+        unix.cd(self.cwd)
+        os.system('cp %s %s' %(PATH.SPECFEM_DATA+'proc000000_jacobian.bin',input_path))
+        os.system('cp %s %s' %(PATH.SPECFEM_DATA+'proc000000_NSPEC_ibool.bin',input_path))
+        os.system('cp %s %s' %(PATH.SPECFEM_DATA+'proc000000_z.bin',input_path))
+        os.system('cp %s %s' %(PATH.SPECFEM_DATA+'proc000000_x.bin',input_path))
+
+        # apply smoothing operator
+        for name in parameters or self.parameters:
+            print 'smoothing', name
+            # using GPU to speed up smoothing
+            call_solver(
+                system.mpiexec(),
+                PATH.SPECFEM_BIN +'/'+ 'xsmooth_sem '
+                + str(span) + ' '
+                + str(span) + ' '
+                + name + '_kernel' + ' '
+                + input_path + '/ '
+                + output_path + '/ '
+                + GPU_mode,
+                output='/dev/null')
+            filename1 = output_path + '/' + 'proc000000_' + name + '_kernel_smooth.bin'
+            filename2 = output_path + '/' + 'proc000000_' + name + '_kernel.bin'
+            os.system("mv %s %s" % (filename1,filename2))
+
+        t2 = time.time()
+        print('smooth done. t = ' ,t2-t1)
 
     ### file transfer utilities
 
@@ -199,7 +271,8 @@ class specfem2d(custom_import('solver', 'base')):
             if PAR.FORMAT in ['SU', 'su']:
                filenames = []
                for channel in PAR.CHANNELS:
-                   filenames += ['U%s_file_single.su' % channel]
+                   #filenames += ['U%s_file_single.su' % channel]
+                   filenames += ['U%s_file_single_d.su' % channel]
                return filenames
 
         else:
@@ -207,7 +280,24 @@ class specfem2d(custom_import('solver', 'base')):
             unix.cd('traces/obs')
 
             if PAR.FORMAT in ['SU', 'su']:
-                return glob('U?_file_single.su')
+                #return glob('U?_file_single.su')
+                return glob('U?_file_single_d.su')
+
+    @property
+    def adj_filenames(self):
+        if PAR.CHANNELS:
+            if PAR.FORMAT in ['SU', 'su']:
+               filenames = []
+               for channel in PAR.CHANNELS:
+                   filenames += ['U%s_file_single.su.adj' % channel]
+               return filenames
+
+        else:
+            unix.cd(self.cwd)
+            unix.cd('traces/obs')
+
+            if PAR.FORMAT in ['SU', 'su']:
+                return glob('U?_file_single.su.adj')
 
     @property
     def model_databases(self):
@@ -223,7 +313,6 @@ class specfem2d(custom_import('solver', 'base')):
 
     # workaround for older versions of SPECFEM2D,
     # which lacked a smoothing utility
-    #if not exists(PATH.SPECFEM_BIN+'/'+'xsmooth_sem'):
-    #    smooth = staticmethod(smooth_legacy)
-    smooth = staticmethod(smooth_legacy)
+    if not exists(PATH.SPECFEM_BIN+'/'+'xsmooth_sem'):
+        smooth = staticmethod(smooth_legacy)
 

@@ -44,6 +44,10 @@ class base(object):
         if 'MUTE' not in PAR:
             setattr(PAR, 'MUTE', None)
 
+        # data muting option
+        if 'MUTE_NEAROFFSET' not in PAR:
+            setattr(PAR, 'MUTE_NEAROFFSET', None)
+
         # data filtering option
         if 'FILTER' not in PAR:
             setattr(PAR, 'FILTER', None)
@@ -94,11 +98,13 @@ class base(object):
             # process observations
             obs = self.apply_filter(obs)
             obs = self.apply_mute(obs)
+            obs = self.apply_mute_nearoffset(obs)
             obs = self.apply_normalize(obs)
 
             # process synthetics
             syn = self.apply_filter(syn)
             syn = self.apply_mute(syn)
+            syn = self.apply_mute_nearoffset(syn)
             syn = self.apply_normalize(syn)
 
             if PAR.MISFIT:
@@ -128,6 +134,21 @@ class base(object):
 
         np.savetxt(filename, residuals)
 
+    def window_residuals(self, syn, obs):
+        """
+        Computes residuals for each window
+
+        :input syn: obspy Stream object containing synthetic data
+        :input obs: obspy Stream object containing observed data
+        """
+        nt, dt, _ = self.get_time_scheme(syn)
+        nn, _ = self.get_network_size(syn)
+
+        residuals = []
+        for ii in range(nn):
+            residuals.append(self.misfit(syn[ii].data, obs[ii].data, nt, dt))
+
+        return residuals        
 
     def sum_residuals(self, files):
         """
@@ -138,7 +159,10 @@ class base(object):
         """
         total_misfit = 0.
         for filename in files:
-            total_misfit += np.sum(np.loadtxt(filename)**2.)
+            # Misfit suppose to be consistant as defined when calculate the
+            # adjoint source .
+            #total_misfit += np.sum(np.loadtxt(filename)**2.)
+            total_misfit += np.sum(np.loadtxt(filename))
         return total_misfit
         
 
@@ -201,6 +225,26 @@ class base(object):
         return traces
 
 
+    def apply_mute_nearoffset(self, traces):
+        if not PAR.MUTE_NEAROFFSET:
+            return traces
+
+        if 'MuteShortOffsets' in PAR.MUTE_NEAROFFSET:
+            print('MuteShortOffsets')
+            traces = signal.mute_short_offsets(traces,
+                PAR.MUTE_SHORT_OFFSETS_DIST,
+                self.get_source_coords(traces),
+                self.get_receiver_coords(traces))
+
+        if 'MuteLongOffsets' in PAR.MUTE_NEAROFFSET:
+            print('MuteLongOffsets')
+            traces = signal.mute_long_offsets(traces,
+                PAR.MUTE_LONG_OFFSETS_DIST,
+                self.get_source_coords(traces),
+                self.get_receiver_coords(traces))
+
+        return traces
+
     def apply_mute(self, traces):
         if not PAR.MUTE:
             return traces
@@ -233,7 +277,10 @@ class base(object):
                 self.get_source_coords(traces),
                 self.get_receiver_coords(traces))
 
-#################Jiang change##################
+        #===
+        # Add this function to mute body waves when invert for
+        # surface waves.   --by WBJ, 2021
+        #===
         if 'MuteBodyWaves' in PAR.MUTE:
             traces = signal.mute_body_waves(traces,
                 PAR.MUTE_BODY_WAVES_SLOPE1, # (units: time/distance)
@@ -243,7 +290,6 @@ class base(object):
                 self.get_time_scheme(traces),
                 self.get_source_coords(traces),
                 self.get_receiver_coords(traces))
-#################Jiang change##################
 
 
         return traces
@@ -261,7 +307,7 @@ class base(object):
             for tr in traces:
                 tr.data /= w
 
-        elif 'NormalizeEventsL2' in PAR.NORMALIZE:
+        if 'NormalizeEventsL2' in PAR.NORMALIZE:
             # normalize event by L2 norm of all traces
             w = 0.
             for tr in traces:
@@ -276,10 +322,17 @@ class base(object):
                 if w > 0:
                     tr.data /= w
 
-        elif 'NormalizeTracesL2' in PAR.NORMALIZE:
+        if 'NormalizeTracesL2' in PAR.NORMALIZE:
             # normalize each trace by its L2 norm
             for tr in traces:
                 w = np.linalg.norm(tr.data, ord=2)
+                if w > 0:
+                    tr.data /= w
+        
+        if 'NormalizeTraces' in PAR.NORMALIZE:
+            # normalize each trace by its L2 norm
+            for tr in traces:
+                w = np.max(np.abs(tr.data))
                 if w > 0:
                     tr.data /= w
 
@@ -365,10 +418,12 @@ class base(object):
             assert 'MUTE_LONG_OFFSETS_DIST' in PAR
             assert 0 < PAR.MUTE_SHORT_OFFSETS_DIST
 
-        if 'MuteShortOffsets' not in PAR.MUTE:
+        if 'MuteShortOffsets' not in PAR.MUTE_NEAROFFSET:
             setattr(PAR, 'MUTE_SHORT_OFFSETS_DIST', 0.)
 
-        if 'MuteLongOffsets' not in PAR.MUTE:
+        #=== change the mute options accomdating more muting process
+        # YYR Dec 23, 2021
+        if 'MuteLongOffsets' not in PAR.MUTE_NEAROFFSET:
             setattr(PAR, 'MUTE_LONG_OFFSETS_DIST', 0.)
 
 
@@ -376,6 +431,7 @@ class base(object):
         assert getset(PAR.NORMALIZE) < set([
             'NormalizeTracesL1',
             'NormalizeTracesL2',
+            'NormalizeTraces',
             'NormalizeEventsL1',
             'NormalizeEventsL2'])
 

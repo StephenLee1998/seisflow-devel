@@ -123,6 +123,8 @@ def mute_short_offsets(traces, dist, s_coords, r_coords):
         offset = np.sqrt((rx-sx)**2 + (ry-sy)**2)
 
         if offset < dist:
+        # debug
+        #    print("trace",'ir',"muted",offset)
             traces[ir].data[:] = 0.
         
     return traces
@@ -145,6 +147,8 @@ def mute_long_offsets(traces, dist, s_coords, r_coords):
         offset = np.sqrt((rx-sx)**2 + (ry-sy)**2)
 
         if offset > dist:
+        # debug
+        #    print("trace",'ir',"muted",offset)
             traces[ir].data[:] = 0.
         
     return traces

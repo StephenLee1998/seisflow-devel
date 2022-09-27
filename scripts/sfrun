@@ -28,7 +28,7 @@ if __name__ == "__main__":
     # register parameters
     parameters = loadpy(args.parameter_file)
     sys.modules['seisflows_parameters'] = Dict(parameters)
-
+    print(parameters)
     # register paths
     paths = tilde_expand(loadpy(args.path_file))
     sys.modules['seisflows_paths'] = Dict(paths)

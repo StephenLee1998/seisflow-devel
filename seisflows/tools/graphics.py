@@ -12,7 +12,8 @@ def plot_gll(x, y, z):
     r = (max(x) - min(x))/(max(y) - min(y))
     rx = r/np.sqrt(1 + r**2)
     ry = 1/np.sqrt(1 + r**2)
-
+    
+    
     f = plt.figure(figsize=(10*rx, 10*ry))
     p = plt.tricontourf(x, y, z, 125)
     plt.axis('image')

@@ -9,6 +9,7 @@ from seisflows.tools.tools import exists
 from seisflows.config import ParameterError, custom_import
 from seisflows.tools.math import nabla
 
+import time
 
 PAR = sys.modules['seisflows_parameters']
 PATH = sys.modules['seisflows_paths']
@@ -50,9 +51,13 @@ class tikhonov1(custom_import('postprocess', 'regularize')):
             return -dg/np.mean(m)
 
         else:
+            print('============= Tikhonov1 ================')
+            t1 = time.time()
             M, grid = mesh2grid(m, mesh)
             #DM = nabla(M, order=1)
             DM = nabla(M, h=[])
             dm = grid2mesh(DM, grid, mesh)
+            t2 = time.time()
+            print('=========  Tikhonov1 time : ',t2-t2 ,'===========')
             return dm/np.mean(m)
 

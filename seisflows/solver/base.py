@@ -2,6 +2,7 @@
 import subprocess
 import sys
 import numpy as np
+import os
 
 from functools import partial
 from glob import glob
@@ -12,7 +13,7 @@ from seisflows.plugins import solver_io
 from seisflows.tools import msg, unix
 from seisflows.tools.seismic import Container, call_solver
 from seisflows.tools.tools import Struct, diff, exists
-
+import time
 
 
 PAR = sys.modules['seisflows_parameters']
@@ -295,6 +296,8 @@ class base(object):
 
         # fill in any missing parameters
         missing_keys = diff(parameters, dict.keys())
+        print('in solver.save')
+        print(missing_keys)
         for iproc in range(self.mesh_properties.nproc):
             for key in missing_keys:
                 dict[key] += self.io.read_slice(
@@ -339,6 +342,8 @@ class base(object):
         """ Sums individual source contributions. Wrapper over xcombine_sem
             utility.
         """
+        t1 = time.time()
+        print('Starting kernal summation')
         if not exists(input_path):
             raise Exception
 
@@ -357,12 +362,16 @@ class base(object):
                 + name + '_kernel' + ' '
                 + 'kernel_paths' + ' '
                 + output_path)
+        t2 = time.time()
+        print('Summation time = ' , t2-t1)
 
 
     def smooth(self, input_path='', output_path='', parameters=[], span=0.):
         """ Smooths kernels by convolving them with a Gaussian.  Wrapper over 
             xsmooth_sem utility.
         """
+        print("Starting smoothing")
+        t1 = time.time()
         if not exists(input_path):
             raise Exception
 
@@ -373,6 +382,8 @@ class base(object):
         unix.cd(self.cwd)
         for name in parameters or self.parameters:
             print ' smoothing', name
+            # using GPU to speed up smoothing
+            GPU_mode = ' true'
             call_solver(
                 system.mpiexec(),
                 PATH.SPECFEM_BIN +'/'+ 'xsmooth_sem '
@@ -380,10 +391,11 @@ class base(object):
                 + str(span) + ' '
                 + name + '_kernel' + ' '
                 + input_path + '/ '
-                + output_path + '/ ',
+                + output_path + '/ '
+                + GPU_mode,
                 output='/dev/null')
-
-        print ''
+        t2 = time.time()
+        print('smooth done . t = ',t2-t1)
 
         # rename output files
         files = glob(output_path+'/*')
@@ -513,6 +525,7 @@ class base(object):
         """
         for filename in self.data_filenames:
             # read traces
+            print(self.cwd +'/'+ 'traces/obs', filename)
             d = preprocess.reader(self.cwd +'/'+ 'traces/obs', filename)
 
             # Adjoint traces are initialized by writing zeros for all channels.

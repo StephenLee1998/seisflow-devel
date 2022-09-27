@@ -1,5 +1,5 @@
 
-DATA = '~/seisflows/tests/setup/test_preprocess/data.su'
+DATA = '/data_1/li_chao/package/seisflows-devel/tests/setup/test_preprocess/data.su'
 
-SYNTHETICS = '~/seisflows/tests/setup/test_preprocess/synthetics.su'
+SYNTHETICS = '/data_1/li_chao/package/seisflows-devel/tests/setup/test_preprocess/synthetics.su'
 

@@ -48,6 +48,9 @@ class multicore(custom_import('system', 'serial')):
         if 'NTASKMAX' not in PAR:
             setattr(PAR, 'NTASKMAX', PAR.NPROCMAX/PAR.NPROC)
 
+        # number of available GPUs
+        if 'NGPU' not in PAR:
+            setattr(PAR, 'NGPU', 1)
 
         # assertions
         assert PAR.NPROC <= PAR.NPROCMAX
@@ -99,6 +102,12 @@ class multicore(custom_import('system', 'serial')):
     def _run_task(self, classname, method, taskid=0):
         env = os.environ.copy().items()
         env += [['SEISFLOWS_TASKID', str(taskid)]]
+
+        #== manually assign tasks to different GPUs
+        # (TODO YYR Dec 21, 2021)
+        env += [['CUDA_VISIBLE_DEVICES',str(taskid%3+1)]]
+        print('TASKID = ',str(taskid) , '  CUDA = ' ,str(taskid%PAR.NGPU+1))
+        
         self.progress(taskid)
 
         p = Popen(

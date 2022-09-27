@@ -124,14 +124,14 @@ class StepWriter(object):
         with open(self.filename, 'a') as fileobj:
             if self.iter == 0:
                 self.iter += 1
-                fmt = '%10d  %10.3e  %10.3e\n'
+                fmt = '%10d  %10.5e  %10.5e\n'
                 fileobj.write(fmt % (self.iter, steplen, funcval))
             elif steplen == 0.:
                 self.iter += 1
-                fmt = '%10d  %10.3e  %10.3e\n'
+                fmt = '%10d  %10.5e  %10.5e\n'
                 fileobj.write(fmt % (self.iter, steplen, funcval))
             else:
-                fmt = 12*' ' + '%10.3e  %10.3e\n'
+                fmt = 12*' ' + '%10.5e  %10.5e\n'
                 fileobj.write(fmt % (steplen, funcval))
 
     def write_header(self):

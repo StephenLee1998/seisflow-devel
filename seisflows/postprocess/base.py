@@ -76,7 +76,12 @@ class base(object):
             # the same file format used for models and gradients; each value of
             # the gradient is scaled by the corresponding value of the mask in a
             # point-wise fashion
-            mask = solver.merge(solver.load(PATH.MASK))
+            if PAR.MATERIALS in ['kappa_mu']:
+                mask = solver.merge(solver.load(PATH.MASK,
+                                    parameters=solver.parameters,
+                                    suffix='_kernel'))
+            else:
+                mask = solver.merge(solver.load(PATH.MASK))
 
             # while both masking and preconditioning involve scaling the
             # gradient, they are fundamentally different operations:
@@ -109,22 +114,26 @@ class base(object):
         """
         if not exists(path):
             raise Exception
-
+        
+        print('flag',PAR.SMOOTH)
         if PAR.SMOOTH > 0:
+            print('combine')
             solver.combine(
-                   input_path=path,
-                   output_path=path+'/'+'sum_nosmooth',
-                   parameters=parameters)
-
+               input_path=path,
+               output_path=path+'/'+'sum_nosmooth',
+               parameters=parameters)
+            print('smooth')
             solver.smooth(
-                   input_path=path+'/'+'sum_nosmooth',
-                   output_path=path+'/'+'sum',
-                   parameters=parameters,
-                   span=PAR.SMOOTH)
+               input_path=path+'/'+'sum_nosmooth',
+               output_path=path+'/'+'sum',
+               parameters=parameters,
+               span=PAR.SMOOTH)
+            print('combine & smoooth finished')
         else:
             solver.combine(
                    input_path=path,
                    output_path=path+'/'+'sum',
                    parameters=parameters)
+            print('combine')
 
 

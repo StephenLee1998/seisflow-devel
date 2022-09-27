@@ -70,21 +70,22 @@ class regularize(custom_import('postprocess', 'base')):
         if exists(fullpath +'/'+ 'sum'):
             unix.mv(fullpath +'/'+ 'sum', fullpath +'/'+ 'sum_nofix')
 
-        print('==========in process_kernels, path==========')
-        print(path)
+        #print('==========in process_kernels, path==========')
+        #print(path)
         # mask sources and receivers
         system.run('postprocess', 'fix_near_field', 
                    #hosts='all', 
                    #path=fullpath)
                    path=path)
-        print('==========fix_near_field end1==========')
+        #print('==========fix_near_field end1==========')
 
-        system.run('solver', 'combine',
-                   #hosts='head',
-                   input_path=path,
-                   output_path=path+'/'+'sum',
-                   parameters=parameters)
-        print('==========combine end==========')
+        if PAR.SMOOTH > 0:
+            system.run('solver', 'combine',
+                       #hosts='head',
+                       input_path=path,
+                       output_path=path+'/'+'sum',
+                       parameters=parameters)
+        #print('==========combine end==========')
 
 
     def fix_near_field(self, path=''):
@@ -100,62 +101,72 @@ class regularize(custom_import('postprocess', 'base')):
 
         #name = solver.check_source_names()[solver.taskid]
         name = self.get_source_names()[solver.taskid]
-        print('==========in fix_near_field, name==========')
-        print(name)
-        print('==========in fix_near_field, path==========')
-        print(path)
+        #print('==========in fix_near_field, name==========')
+        #print(name)
+        #print('==========in fix_near_field, path==========')
+        #print(path)
         fullpath = path +'/'+ name
-        print('==========in fix_near_field, fullpath==========')
-        print(fullpath)
+        #print('==========in fix_near_field, fullpath==========')
+        #print(fullpath)
         g = solver.load(fullpath, suffix='_kernel')
         if not PAR.FIXRADIUS:
             return
-
-        print('==========load end==========')
-        mesh = self.getmesh()
+        
+        print('MASKING!!!')
+        #print('==========load end==========')
+        #mesh = self.getmesh()
         x,z = self.getxz()
 
-        lx = x.max() - x.min()
-        lz = z.max() - z.min()
-        nn = x.size
-        nx = np.around(np.sqrt(nn*lx/lz))
-        nz = np.around(np.sqrt(nn*lz/lx))
-        dx = lx/nx
-        dz = lz/nz
+        #lx = x.max() - x.min()
+        #lz = z.max() - z.min()
+        #nn = x.size
+        #nx = np.around(np.sqrt(nn*lx/lz))
+        #nz = np.around(np.sqrt(nn*lz/lx))
+        #dx = lx/nx
+        #dz = lz/nz
 
-        sigma = 0.5*PAR.FIXRADIUS*(dx+dz)
+        #sigma = 0.5*PAR.FIXRADIUS*(dx+dz)
+        sigma = PAR.FIXRADIUS
 
-        print('==========stage 1==========')
-        sx, sy, sz = preprocess.get_source_coords(
-            preprocess.reader(
-                solver.cwd+'/'+'traces/obs', solver.data_filenames[0]))
-        print('==========stage 2==========')
+        ### Mask the source from source.dat in PATH.DATA
+        if PAR.MASK_SOURCE == 'true':
+            SOURCE_P = join(solver.cwd,'DATA','SOURCE')
+            with open(SOURCE_P)  as f:
+                line = f.readlines()
+            sx = np.float(line[1].strip().split('=')[1])
+            sz = np.float(line[2].strip().split('=')[1])
+        else:
 
-        rx, ry, rz = preprocess.get_receiver_coords(
-            preprocess.reader(
-                solver.cwd+'/'+'traces/obs', solver.data_filenames[0]))
-        print('==========stage 3==========')
+            sx,sy,sz = preprocess.get_source_coords(
+                preprocess.reader(solver.cwd+'/'+'traces/obs',
+                                  solver.data_filenames[0]))
+            
+            rx,ry,rz = preprocess.get_source_coords(
+                preprocess.reader(solver.cwd+'/'+'traces/obs',
+                                  solver.data_filenames[0]))
 
+        #print(x,z)
         # mask sources
-        mask = np.exp(-0.5*((x-sx[0])**2.+(z-sy[0])**2.)/sigma**2.)
+        mask = np.exp(-0.5*((x-sx)**2.+(z-sz)**2.)/sigma**2.)
         for key in solver.parameters:
+            #li_chao 2022,05,19
             weight = np.sum(mask*g[key][0])/np.sum(mask)
             g[key][0] *= 1.-mask
             g[key][0] += mask*weight
-        print('==========stage 4==========')
 
-        ## It is dangerous to mask receivers because the number of receiver may not be a fix number, and it is too slow
-		## mask receivers
-        for ir in range(PAR.NREC):
-            mask = np.exp(-0.5*((x-rx[ir])**2.+(z-ry[ir])**2.)/sigma**2.)
-            for key in solver.parameters:
-                weight = np.sum(mask*g[key][0])/np.sum(mask)
-                g[key][0] *= 1.-mask
-                g[key][0] += mask*weight
+        ### It is dangerous to mask receivers because the number of receiver may not be a fix number, and it is too slow
+		### mask receivers
+        #for ir in range(PAR.NREC):
+        #    mask = np.exp(-0.5*((x-rx[ir])**2.+(z-ry[ir])**2.)/sigma**2.)
+        #    for key in solver.parameters:
+        #        weight = np.sum(mask*g[key][0])/np.sum(mask)
+        #        g[key][0] *= 1.-mask
+        #        g[key][0] += mask*weight
 
         #solver.save(fullpath, g, suffix='_kernel')
         solver.save(g, fullpath, suffix='_kernel')
-        print('==========in fix_near_field, end==========')
+        
+        #print('==========in fix_near_field, end==========')
 
 
     def nabla(self, mesh, m, g):
